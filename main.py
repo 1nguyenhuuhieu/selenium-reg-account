@@ -19,10 +19,10 @@ pytesseract.tesseract_cmd = path_to_tesseract
 
 class UserInfo:
     def __init__(self):
-        self.user = 'test256147'
+        self.user = 'test13222'
         self.pwd = 'Matkhau@2023'
         self.money_pwd = '123456'
-        self.name = 'NGUYEN VAN MANH'
+        self.name = 'NGUYEN HOANG OANH'
 
 
 def init_driver(proxy_server):
@@ -51,28 +51,22 @@ def fill_register_form(driver, user_info):
     inputs = driver.find_elements(By.TAG_NAME, 'input')
     for input in inputs:
         if input.get_attribute('ng-model') == '$ctrl.user.account.value':
-            input.clear()
             input.send_keys(user_info.user)
         if input.get_attribute('ng-model') == '$ctrl.user.password.value':
-            input.clear()
             input.send_keys(user_info.pwd)
         if input.get_attribute('ng-model') == '$ctrl.user.confirmPassword.value':
-            input.clear()
             input.send_keys(user_info.pwd)
         if input.get_attribute('ng-model') == '$ctrl.user.moneyPassword.value':
-            input.clear()
             input.send_keys(user_info.money_pwd)
         if input.get_attribute('ng-model') == '$ctrl.user.name.value':
-            input.clear()
             input.send_keys(user_info.name)
         if input.get_attribute('ng-model') == '$ctrl.code':
-            input.clear()
             input.click()
             time.sleep(1)
             imgs = driver.find_elements(By.TAG_NAME, 'img')
             for img in imgs:
                 if img.get_attribute('ng-class') == '$ctrl.styles.captcha':
-                    base64_str = img.get_attribute('src')
+                    base64_str = img.get_attribute('ng-src')
                     base64_img = base64_str.split(',')
                     base64_img = base64_img[1]
                     imgdata = base64.b64decode(base64_img)
@@ -80,24 +74,40 @@ def fill_register_form(driver, user_info):
                     text = pytesseract.image_to_string(img)
                     text = text[0:4]
                     input.send_keys(text)
-                    submit = driver.find_element(By.CSS_SELECTOR, 'button[type="submit"]')
-                    submit.click()
-                    time.sleep(1000000000)
+                    time.sleep(2)
+                    form = driver.find_element(By.TAG_NAME, 'form')
+                    form.submit()
+                    time.sleep(2)
+
 
 def open_register_form(driver, url_register):
     driver.get(url_register)
     time.sleep(2)
+    try:
+        btns = WebDriverWait(driver, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, "button")) 
+        for btn in btns:
+            if btn.get_attribute('ng-click') == '$ctrl.ok()':
+                btn.click()
+                time.sleep(1)
+    except:
+        pass
+    try:
+        spans = WebDriverWait(driver, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, "span")) 
+        for span in spans:
+            if span.get_attribute('ng-click') == '$ctrl.ok()':
+                span.click()
+                time.sleep(1)
+    except:
+        pass
 
-    spans = WebDriverWait(driver, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, "span")) 
-    for span in spans:
-        if span.get_attribute('ng-click') == '$ctrl.ok()':
-            span.click()
-            time.sleep(1)
-            buttons = driver.find_elements(By.TAG_NAME, 'button')
-            for button in buttons:
-                if button.get_attribute('ng-class') == '$ctrl.styles.reg':
-                    button.click()
-                    return True
+    try:
+        buttons = driver.find_elements(By.TAG_NAME, 'button')
+        for button in buttons:
+            if button.get_attribute('ng-class') == '$ctrl.styles.reg':
+                button.click()
+                return True
+    except:
+        return False
 
 
 if __name__ == "__main__":
@@ -105,7 +115,14 @@ if __name__ == "__main__":
     time.sleep(2)
     webs = init_webs('webs.txt')
     for url_web in webs:
-        is_openned_register_form = open_register_form(driver, url_web)
-        time.sleep(2)
-        if is_openned_register_form:
-            fill_register_form(driver, user_info)
+        try:
+            is_openned_register_form = open_register_form(driver, url_web)
+            time.sleep(2)
+            if is_openned_register_form:
+                user_info = UserInfo()
+                fill_register_form(driver, user_info)
+                time.sleep(10)
+
+        except:
+            print(f'error web: {url_web}')
+            pass

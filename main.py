@@ -5,6 +5,7 @@ from io import BytesIO
 from pytesseract import pytesseract
 from PIL import Image
 from selenium.webdriver.support.wait import WebDriverWait
+import openpyxl
 
 import base64
 
@@ -23,6 +24,7 @@ class UserInfo:
         self.money_pwd = '123456'
         self.name = 'NGUYEN VAN MANH'
 
+
 def init_driver(proxy_server):
 
     chrome_options = webdriver.ChromeOptions()
@@ -31,7 +33,20 @@ def init_driver(proxy_server):
 
     return driver
 
-
+def init_webs(file_path):
+    webs = []
+    f = open(file_path)
+    for line in f:
+        webs.append(line)
+    
+    return webs
+def init_user_info(file_path):
+    users_info = []
+    dataframe = openpyxl.load_workbook(file_path)
+    dataframe1 = dataframe.active
+    for row in range(0, dataframe1.max_row):
+        for col in dataframe1.iter_cols(1, dataframe1.max_column):
+            print(col[row].value)
 def fill_register_form(driver, user_info):
     inputs = driver.find_elements(By.TAG_NAME, 'input')
     for input in inputs:
@@ -63,7 +78,7 @@ def fill_register_form(driver, user_info):
                     imgdata = base64.b64decode(base64_img)
                     img = Image.open(BytesIO(imgdata))
                     text = pytesseract.image_to_string(img)
-                    text = text[:-1]
+                    text = text[0:4]
                     input.send_keys(text)
                     submit = driver.find_element(By.CSS_SELECTOR, 'button[type="submit"]')
                     submit.click()
@@ -85,14 +100,12 @@ def open_register_form(driver, url_register):
                     return True
 
 
-url_register = 'https://www.69vn1.com/'
-user_info = UserInfo()
-
-
 if __name__ == "__main__":
     driver = init_driver(proxy_server)
     time.sleep(2)
-    is_openned_register_form = open_register_form(driver, url_register)
-    time.sleep(2)
-    if is_openned_register_form:
-        fill_register_form(driver, user_info)
+    webs = init_webs('webs.txt')
+    for url_web in webs:
+        is_openned_register_form = open_register_form(driver, url_web)
+        time.sleep(2)
+        if is_openned_register_form:
+            fill_register_form(driver, user_info)

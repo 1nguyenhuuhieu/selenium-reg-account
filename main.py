@@ -4,9 +4,9 @@ from io import BytesIO
 
 from pytesseract import pytesseract
 from PIL import Image
-import requests
+from selenium.webdriver.support.wait import WebDriverWait
 
-
+import base64
 
 
 import time
@@ -20,9 +20,8 @@ class UserInfo:
     def __init__(self):
         self.user = 'test256147'
         self.pwd = 'Matkhau@2023'
-        self.pin_bank = '123456'
-        self.name = 'Nguyễn Văn test'
-        self.pin_bank = '123456'
+        self.money_pwd = '123456'
+        self.name = 'NGUYEN VAN MANH'
 
 def init_driver(proxy_server):
 
@@ -33,33 +32,67 @@ def init_driver(proxy_server):
     return driver
 
 
+def fill_register_form(driver, user_info):
+    inputs = driver.find_elements(By.TAG_NAME, 'input')
+    for input in inputs:
+        if input.get_attribute('ng-model') == '$ctrl.user.account.value':
+            input.clear()
+            input.send_keys(user_info.user)
+        if input.get_attribute('ng-model') == '$ctrl.user.password.value':
+            input.clear()
+            input.send_keys(user_info.pwd)
+        if input.get_attribute('ng-model') == '$ctrl.user.confirmPassword.value':
+            input.clear()
+            input.send_keys(user_info.pwd)
+        if input.get_attribute('ng-model') == '$ctrl.user.moneyPassword.value':
+            input.clear()
+            input.send_keys(user_info.money_pwd)
+        if input.get_attribute('ng-model') == '$ctrl.user.name.value':
+            input.clear()
+            input.send_keys(user_info.name)
+        if input.get_attribute('ng-model') == '$ctrl.code':
+            input.clear()
+            input.click()
+            time.sleep(1)
+            imgs = driver.find_elements(By.TAG_NAME, 'img')
+            for img in imgs:
+                if img.get_attribute('ng-class') == '$ctrl.styles.captcha':
+                    base64_str = img.get_attribute('src')
+                    base64_img = base64_str.split(',')
+                    base64_img = base64_img[1]
+                    imgdata = base64.b64decode(base64_img)
+                    img = Image.open(BytesIO(imgdata))
+                    text = pytesseract.image_to_string(img)
+                    text = text[:-1]
+                    input.send_keys(text)
+                    submit = driver.find_element(By.CSS_SELECTOR, 'button[type="submit"]')
+                    submit.click()
+                    time.sleep(1000000000)
+
+def open_register_form(driver, url_register):
+    driver.get(url_register)
+    time.sleep(2)
+
+    spans = WebDriverWait(driver, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, "span")) 
+    for span in spans:
+        if span.get_attribute('ng-click') == '$ctrl.ok()':
+            span.click()
+            time.sleep(1)
+            buttons = driver.find_elements(By.TAG_NAME, 'button')
+            for button in buttons:
+                if button.get_attribute('ng-class') == '$ctrl.styles.reg':
+                    button.click()
+                    return True
+
+
+url_register = 'https://www.69vn1.com/'
+user_info = UserInfo()
+
+
 if __name__ == "__main__":
     driver = init_driver(proxy_server)
     time.sleep(2)
-
-    driver.get('https://www.69vn1.com/')
+    is_openned_register_form = open_register_form(driver, url_register)
     time.sleep(2)
-
-    spans = driver.find_elements(By.TAG_NAME, "span")
-    for span in spans:
-        if span.text == 'Đóng':
-            span.click()
-            break
-    time.sleep(2)
-
-    spans = driver.find_elements(By.TAG_NAME, "span")
-    for span in spans:
-        if span.text == 'ĐĂNG KÝ':
-            span.click()
-            break
-    time.sleep(2)
-    for i in range(5):
-        response = requests.get(image_path)
-        img = Image.open(BytesIO(response.content))
-        text = pytesseract.image_to_string(img)
-        text = text[:-1]
-        text = text.lower()
-        text = text.replace(" ","")
-        texts.append(text)
-
-    captcha_text = max(texts,key=texts.count)
+    if is_openned_register_form:
+        fill_register_form(driver, user_info)

@@ -113,10 +113,17 @@ def save_record_to_database(record):
     cursor = conn.cursor()
 
     # Create a table if it doesn't exist
-    cursor.execute('''CREATE TABLE IF NOT EXISTS records (
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        time_created DATETIME,
+                        username TEXT,
+                        pwd_login TEXT,
+                        pwd_money TEXT,
+                        url_web TEXT,
+                        pwd_bank_account INTEGER,
+                        pwd_bank_branch TEXT,
                         name TEXT,
-                        age INTEGER
+                        phone TEXT
                     )''')
 
     # Insert the record into the table

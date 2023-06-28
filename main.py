@@ -18,14 +18,72 @@ from datetime import datetime
 
 import sqlite3
 
-proxy_server = '171.234.58.26:25373'
+import pandas as pd
+
+import requests
+
+proxy_server = '116.106.179.89:6241'
+
+
+tmp_proxy_apikey = 'a37a0d79fe6df60b9ffc7b3eec6de257'
+url_new_proxy = "https://tmproxy.com/api/proxy/get-new-proxy"
+url_current_proxy = "https://tmproxy.com/api/proxy/get-current-proxy"
+
+
 path_to_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 pytesseract.tesseract_cmd = path_to_tesseract
 
+def get_proxy():
+    new_proxy_json = {
+    "api_key": tmp_proxy_apikey,
+    "sign": "string",
+    "id_location": 0
+    }
+
+    current_proxy_json = {
+    "api_key": tmp_proxy_apikey
+    }
+    r = requests.post(url_new_proxy, json=new_proxy_json)
+    if r.json()['data']['https']:
+        proxy =  r.json()['data']['https']
+        return proxy
+    else:
+        r = requests.post(url_current_proxy, json=current_proxy_json)
+        if r.json()['data']['https']:
+            proxy =  r.json()['data']['https']
+            return proxy
+        else:
+            print("Lỗi, không lấy được proxy")
+            return None
+
+def excel_to_dictionary(file_path):
+    df = pd.read_excel(file_path)  # Read the Excel file
+
+    data = df.to_dict(orient='records')  # Convert DataFrame to a list of dictionaries
+
+    return data
+
+
+def load_image_from_base64(data_url):
+    # Extract the base64 encoded image data
+    _, base64_data = data_url.split(',', 1)
+
+    # Decode the base64 data
+    image_data = base64.b64decode(base64_data)
+
+    # Create a BytesIO object to load the image data
+    image_buffer = BytesIO(image_data)
+
+    # Open the image using PIL
+    image = Image.open(image_buffer)
+
+    return image
+
+
 def generate_password(length=8):
-    characters = string.ascii_letters + string.digits + string.punctuation
+    characters = string.ascii_letters
     password = ''.join(random.choice(characters) for _ in range(length))
-    password += '0'
+    password += '@aA0'
     return password
 
 def no_accent_vietnamese(s):
@@ -68,46 +126,37 @@ class UserInfo:
         clear_name = no_accent_vietnamese(name)
 
         self.name = clear_name.upper()
+        self.username = generate_username(clear_name.lower())
 
         self.phone = phone
         self.bank_account = bank_account
         self.bank_branch = bank_branch
 
-        self.registed = []
+        self.pwd_login = generate_password()
+        self.pwd_money = str(random.randint(10000000, 100000000))
 
-    def get_username(self):
-        name_lower = self.name.lower()
-        return generate_username(name_lower)
-    
-    def get_pwd_login():
-        return generate_password()
-    
-    def get_pwd_money():
-        return random.randint(10000000, 100000000)
 
 def init_driver(proxy_server):
 
     chrome_options = webdriver.ChromeOptions()
-    # chrome_options.add_argument('--proxy-server=' + proxy_server)
+    chrome_options.add_argument("--start-maximized")
+    if proxy_server:
+        chrome_options.add_argument('--proxy-server=' + proxy_server)
+    else:
+        print("Sử dụng IP thật")
     driver = webdriver.Chrome(options=chrome_options)
 
     return driver
 
-def init_webs(file_path):
-    webs = []
-    f = open(file_path)
-    for line in f:
-        webs.append(line)
-    return webs
-def init_user_info(file_path):
-    users_info = []
-    dataframe1 = dataframe.active
-    for row in range(0, dataframe1.max_row):
-        for col in dataframe1.iter_cols(1, dataframe1.max_column):
-            print(col[row].value)
+def file_to_list(file_path):
+    with open(file_path, 'r') as file:
+        content = file.readlines()
+        content = [line.strip() for line in content]
+
+    return content
 
 
-def save_record_to_database(record):
+def save_record_to_database(user, url_web):
     now = datetime.now()
     # Connect to the database (create a new one if it doesn't exist)
     conn = sqlite3.connect('database.db')
@@ -123,7 +172,7 @@ def save_record_to_database(record):
                         pwd_login TEXT,
                         pwd_money TEXT,
                         url_web TEXT,
-                        bank_account INTEGER,
+                        bank_account TEXT,
                         bank_branch TEXT,
                         name TEXT,
                         phone TEXT
@@ -140,16 +189,15 @@ def save_record_to_database(record):
         bank_branch,
         name,
         phone
-        ) VALUES (?, ?, ?,?,?,?,?,?,?)""", (now,
-                                            user['username'],
-                                            user['pwd_login'],
-                                            user['pwd_money'],
-                                            user['url_web'],
-                                            user['bank_account'],
-                                            user['bank_branch'],
-                                            user['name'],
-                                            user['phone']
-                                            ))
+        ) VALUES (?,?,?,?,?,?,?,?,?)""", (now,
+                                        user.username,
+                                        user.pwd_login,
+                                        user.pwd_money,
+                                        url_web,
+                                        user.bank_account,
+                                        user.bank_branch,
+                                        user.name,
+                                        user.phone))
 
     # Commit the changes
     conn.commit()
@@ -158,107 +206,127 @@ def save_record_to_database(record):
     cursor.close()
     conn.close()
 
+def click_element(driver, tag_name, attribute_name, value):
+    try:
+        elms = WebDriverWait(driver, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, tag_name)) 
+        for elm in elms:
+            if elm.get_attribute(attribute_name) == value:
+                try:
+                    elm.click()
+                except:
+                    pass
+                time.sleep(2)
+                return True
+    except:
+        return False
     
-def fill_register_form(driver, user_info):
-    username = user_info.get_username()
-    pwd_login = user_info.get_pwd_login()
-    pwd_money = user_info.get_pwd_money()
+def fill_register_form(driver, user):
     inputs = driver.find_elements(By.TAG_NAME, 'input')
     for input in inputs:
         if input.get_attribute('ng-model') == '$ctrl.user.account.value':
-            input.send_keys(username)
+            input.send_keys(user.username)
         if input.get_attribute('ng-model') == '$ctrl.user.password.value':
-            input.send_keys(pwd_login)
+            input.send_keys(user.pwd_login)
         if input.get_attribute('ng-model') == '$ctrl.user.confirmPassword.value':
-            input.send_keys(pwd_login)
+            input.send_keys(user.pwd_login)
         if input.get_attribute('ng-model') == '$ctrl.user.moneyPassword.value':
-            input.send_keys(pwd_money)
+            input.send_keys(user.pwd_money)
         if input.get_attribute('ng-model') == '$ctrl.user.name.value':
-            input.send_keys(user_info.name)
+            input.send_keys(user.name)
+        if input.get_attribute('ng-model') == '$ctrl.user.mobile.value':
+            input.send_keys(user.phone)
         if input.get_attribute('ng-model') == '$ctrl.code':
             input.click()
-            time.sleep(1)
+            time.sleep(2)
             imgs = driver.find_elements(By.TAG_NAME, 'img')
             for img in imgs:
                 if img.get_attribute('ng-class') == '$ctrl.styles.captcha':
-                    base64_str = img.get_attribute('ng-src')
-                    base64_img = base64_str.split(',')
-                    base64_img = base64_img[1]
-                    imgdata = base64.b64decode(base64_img)
-                    img = Image.open(BytesIO(imgdata))
+                    data_url = img.get_attribute('src')
+                    img = load_image_from_base64(data_url)
                     text = pytesseract.image_to_string(img)
                     text = text[0:4]
                     input.send_keys(text)
                     time.sleep(2)
                     form = driver.find_element(By.TAG_NAME, 'form')
                     form.submit()
-                    time.sleep(10)
-                    spans = driver.find_elements(By.TAG_NAME, 'span')
-                    for span in spans:
-                        if user_info.username in span.text:
-                            # saved to database
-                            save_record_to_database(user_info)
-                            return True
-                    
-                    return False
+                    time.sleep(2)
+                    break
+
+
+def check_register_success(driver):
+    driver.refresh()
+    time.sleep(2)
+    click_element(driver, "button", "ng-click", "$ctrl.ok()")
+    click_element(driver, "span", "ng-click", "$ctrl.ok()")
+    elms = WebDriverWait(driver, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, 'button')) 
+    for elm in elms:
+        if elm.get_attribute("ng-class") == "$ctrl.styles.reg":
+            return False
+    
+    return True
+    
+
 
 def open_register_form(driver, url_register):
     driver.get(url_register)
     time.sleep(2)
-    try:
-        btns = WebDriverWait(driver, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, "button")) 
-        for btn in btns:
-            if btn.get_attribute('ng-click') == '$ctrl.ok()':
-                btn.click()
-                time.sleep(1)
-    except:
-        pass
-    try:
-        spans = WebDriverWait(driver, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, "span")) 
-        for span in spans:
-            if span.get_attribute('ng-click') == '$ctrl.ok()':
-                span.click()
-                time.sleep(1)
-    except:
-        pass
 
-    try:
-        buttons = driver.find_elements(By.TAG_NAME, 'button')
-        for button in buttons:
-            if button.get_attribute('ng-class') == '$ctrl.styles.reg':
-                button.click()
-                return True
-    except:
-        return False
+    click_element(driver, "button", "ng-click", "$ctrl.ok()")
+    click_element(driver, "span", "ng-click", "$ctrl.ok()")
+    return click_element(driver, "button", "ng-class", "$ctrl.styles.reg")
+
+def append_to_file(file_path, content):
+    with open(file_path, 'a') as file:
+        file.write(content + '\n')
+
 
 if __name__ == "__main__":
-    time.sleep(2)
-    users = []
-    user_info = UserInfo('Nguyễn Văn Long Hải',97845165465,123456789,'haf noo')
-    users.append(user_info)
+    file_user_path = 'users.xlsx'
+    users = excel_to_dictionary(file_user_path)
 
-    webs = init_webs('webs.txt')
-    for user in users:
-        print(f'Bắt đầu đăng kí tài khoản: {user.name}. Số tài khoản: {user.bank_account}')
+    file_webs_path = 'webs.txt'
+    webs = file_to_list(file_webs_path)
+
+    for user_info in users:
+        proxy_server = get_proxy()
         for url_web in webs:
             driver = init_driver(proxy_server)
             print(f'Khởi tạo driver mới, proxy: {proxy_server}')
-            time.sleep(1)
+            print(f'{url_web} --- Bắt đầu đăng kí tài khoản: {user_info["name"]}. Số tài khoản: {user_info["bank_account"]}')
             try:
-                is_openned_register_form = open_register_form(driver, url_web)
-                time.sleep(2)
-                if is_openned_register_form:
-                    is_register_success = False
-                    limit_try = 5
-                    while limit_try > 0 and not is_register_success:
-                        print(f'Thử đăng kí lần {6-limit_try}')
-                        is_register_success = fill_register_form(driver, user)
+                is_register_success = False
+                limit_try = 10
+                while limit_try > 0 and not is_register_success:
+                    open_register_form(driver, url_web)
+                    print(f'Thử đăng kí lần {11-limit_try}')
+                    limit_try -= 1
+                    try:
+                        user = UserInfo(user_info['name'],
+                                        str(user_info['phone']),
+                                        str(user_info['bank_account']),
+                                        user_info['bank']
+                                        )
+                        fill_register_form(driver, user)
                         time.sleep(2)
-
+                        is_register_success = check_register_success(driver) 
+                        if is_register_success:
+                            print(f'[{url_web}] Đăng kí thành công tài khoản {user.username}, mật khẩu đăng nhập: {user.pwd_login}, mật khẩu rút tiền: {user.pwd_money}')
+                            time.sleep(2)
+                            # saved to database
+                            try:
+                                save_record_to_database(user, url_web)
+                                print('Ghi vào database thành công')
+                            except:
+                                print('Lỗi khi ghi vào database')
+                            break
+                        time.sleep(2)
+                    except:
+                        open_register_form(driver, url_web)
             except:
-                print(f'error web: {url_web}')
-                pass
-            
-            print('Đăng kí thành công')
+                print(f'Lỗi khi đăng ký: {url_web}')
+                file_path = 'errors.txt'
+                append_to_file(file_path, url_web)
             driver.quit()
             time.sleep(2)
+       
+        time.sleep(1)

@@ -62,19 +62,24 @@ def generate_username(name):
 class UserInfo:
     def __init__(self, name, phone, bank_account, bank_branch):
         clear_name = no_accent_vietnamese(name)
-        clear_name_upper = no_accent_vietnamese(name).upper()
 
-        self.username = generate_username(clear_name)
-
-        self.pwd_login = generate_password()
-        self.pwd_money = random.randint(10000000, 100000000)
-        self.name = clear_name_upper
+        self.name = clear_name.upper()
 
         self.phone = phone
         self.bank_account = bank_account
         self.bank_branch = bank_branch
 
         self.registed = []
+
+    def get_username(self):
+        name_lower = self.name.lower()
+        return generate_username(name_lower)
+    
+    def get_pwd_login():
+        return generate_password()
+    
+    def get_pwd_money():
+        return random.randint(10000000, 100000000)
 
 def init_driver(proxy_server):
 
@@ -97,16 +102,19 @@ def init_user_info(file_path):
         for col in dataframe1.iter_cols(1, dataframe1.max_column):
             print(col[row].value)
 def fill_register_form(driver, user_info):
+    username = user_info.get_username()
+    pwd_login = user_info.get_pwd_login()
+    pwd_money = user_info.get_pwd_money()
     inputs = driver.find_elements(By.TAG_NAME, 'input')
     for input in inputs:
         if input.get_attribute('ng-model') == '$ctrl.user.account.value':
-            input.send_keys(user_info.username)
+            input.send_keys(username)
         if input.get_attribute('ng-model') == '$ctrl.user.password.value':
-            input.send_keys(user_info.pwd_login)
+            input.send_keys(pwd_login)
         if input.get_attribute('ng-model') == '$ctrl.user.confirmPassword.value':
-            input.send_keys(user_info.pwd_login)
+            input.send_keys(pwd_login)
         if input.get_attribute('ng-model') == '$ctrl.user.moneyPassword.value':
-            input.send_keys(user_info.pwd_money)
+            input.send_keys(pwd_money)
         if input.get_attribute('ng-model') == '$ctrl.user.name.value':
             input.send_keys(user_info.name)
         if input.get_attribute('ng-model') == '$ctrl.code':
@@ -164,19 +172,33 @@ def open_register_form(driver, url_register):
         return False
 
 if __name__ == "__main__":
-    driver = init_driver(proxy_server)
     time.sleep(2)
-    webs = init_webs('webs.txt')
-    for url_web in webs:
-        time.sleep(1)
-        try:
-            is_openned_register_form = open_register_form(driver, url_web)
-            time.sleep(2)
-            if is_openned_register_form:
-                user_info = UserInfo('Nguyễn Văn Long Hải',97845165465,123456789,'haf noo')
-                fill_register_form(driver, user_info)
-                time.sleep(10)
+    users = []
+    user_info = UserInfo('Nguyễn Văn Long Hải',97845165465,123456789,'haf noo')
+    users.append(user_info)
 
-        except:
-            print(f'error web: {url_web}')
-            pass
+    webs = init_webs('webs.txt')
+    for user in users:
+        print(f'Bắt đầu đăng kí tài khoản: {user.name}. Số tài khoản: {user.bank_account}')
+        for url_web in webs:
+            driver = init_driver(proxy_server)
+            print(f'Khởi tạo driver mới, proxy: {proxy_server}')
+            time.sleep(1)
+            try:
+                is_openned_register_form = open_register_form(driver, url_web)
+                time.sleep(2)
+                if is_openned_register_form:
+                    is_register_success = False
+                    limit_try = 5
+                    while limit_try > 0 and not is_register_success:
+                        print(f'Thử đăng kí lần {6-limit_try}')
+                        is_register_success = fill_register_form(driver, user)
+                        time.sleep(2)
+
+            except:
+                print(f'error web: {url_web}')
+                pass
+            
+            print('Đăng kí thành công')
+            driver.quit()
+            time.sleep(2)

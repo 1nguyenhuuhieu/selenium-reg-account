@@ -5,24 +5,79 @@ from io import BytesIO
 from pytesseract import pytesseract
 from PIL import Image
 from selenium.webdriver.support.wait import WebDriverWait
-import openpyxl
 
 import base64
 
+import random
+import string
+
 
 import time
+import re
 
 
 proxy_server = '171.234.58.26:25373'
 path_to_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 pytesseract.tesseract_cmd = path_to_tesseract
 
+def generate_password(length=8):
+    characters = string.ascii_letters + string.digits + string.punctuation
+    password = ''.join(random.choice(characters) for _ in range(length))
+    password += '0'
+    return password
+
+def no_accent_vietnamese(s):
+    s = re.sub(r'[àáạảãâầấậẩẫăằắặẳẵ]', 'a', s)
+    s = re.sub(r'[ÀÁẠẢÃĂẰẮẶẲẴÂẦẤẬẨẪ]', 'A', s)
+    s = re.sub(r'[èéẹẻẽêềếệểễ]', 'e', s)
+    s = re.sub(r'[ÈÉẸẺẼÊỀẾỆỂỄ]', 'E', s)
+    s = re.sub(r'[òóọỏõôồốộổỗơờớợởỡ]', 'o', s)
+    s = re.sub(r'[ÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠ]', 'O', s)
+    s = re.sub(r'[ìíịỉĩ]', 'i', s)
+    s = re.sub(r'[ÌÍỊỈĨ]', 'I', s)
+    s = re.sub(r'[ùúụủũưừứựửữ]', 'u', s)
+    s = re.sub(r'[ƯỪỨỰỬỮÙÚỤỦŨ]', 'U', s)
+    s = re.sub(r'[ỳýỵỷỹ]', 'y', s)
+    s = re.sub(r'[ỲÝỴỶỸ]', 'Y', s)
+    s = re.sub(r'[Đ]', 'D', s)
+    s = re.sub(r'[đ]', 'd', s)
+    return s
+
+def remove_spaces(string):
+    return string.replace(" ", "")
+
+def generate_username(name):
+    username = ''
+    name = name.lower()
+    names = reversed(name.split(' '))
+    for index, name in enumerate(names):
+        if index == 0:
+            username += name
+        else:
+            username += name[0]
+    number =  random.randint(100, 1000)
+    username += str(number)
+
+    return username
+
+
 class UserInfo:
-    def __init__(self):
-        self.user = 'test13222'
-        self.pwd = 'Matkhau@2023'
-        self.money_pwd = '123456'
-        self.name = 'NGUYEN HOANG OANH'
+    def __init__(self, name, phone, bank_account, bank_branch):
+        clear_name = no_accent_vietnamese(name)
+        clear_name_upper = no_accent_vietnamese(name).upper()
+
+        self.username = generate_username(clear_name)
+
+        self.pwd_login = generate_password()
+        self.pwd_money = random.randint(10000000, 100000000)
+        self.name = clear_name_upper
+
+        self.phone = phone
+        self.bank_account = bank_account
+        self.bank_branch = bank_branch
+
+        self.registed = []
+ 
 
 
 def init_driver(proxy_server):
@@ -42,7 +97,6 @@ def init_webs(file_path):
     return webs
 def init_user_info(file_path):
     users_info = []
-    dataframe = openpyxl.load_workbook(file_path)
     dataframe1 = dataframe.active
     for row in range(0, dataframe1.max_row):
         for col in dataframe1.iter_cols(1, dataframe1.max_column):
@@ -51,13 +105,13 @@ def fill_register_form(driver, user_info):
     inputs = driver.find_elements(By.TAG_NAME, 'input')
     for input in inputs:
         if input.get_attribute('ng-model') == '$ctrl.user.account.value':
-            input.send_keys(user_info.user)
+            input.send_keys(user_info.username)
         if input.get_attribute('ng-model') == '$ctrl.user.password.value':
-            input.send_keys(user_info.pwd)
+            input.send_keys(user_info.pwd_login)
         if input.get_attribute('ng-model') == '$ctrl.user.confirmPassword.value':
-            input.send_keys(user_info.pwd)
+            input.send_keys(user_info.pwd_login)
         if input.get_attribute('ng-model') == '$ctrl.user.moneyPassword.value':
-            input.send_keys(user_info.money_pwd)
+            input.send_keys(user_info.pwd_money)
         if input.get_attribute('ng-model') == '$ctrl.user.name.value':
             input.send_keys(user_info.name)
         if input.get_attribute('ng-model') == '$ctrl.code':
@@ -76,8 +130,8 @@ def fill_register_form(driver, user_info):
                     input.send_keys(text)
                     time.sleep(2)
                     form = driver.find_element(By.TAG_NAME, 'form')
-                    form.submit()
-                    time.sleep(2)
+                    # form.submit()
+                    time.sleep(200)
 
 def open_register_form(driver, url_register):
     driver.get(url_register)
@@ -114,11 +168,12 @@ if __name__ == "__main__":
     time.sleep(2)
     webs = init_webs('webs.txt')
     for url_web in webs:
+        time.sleep(1)
         try:
             is_openned_register_form = open_register_form(driver, url_web)
             time.sleep(2)
             if is_openned_register_form:
-                user_info = UserInfo()
+                user_info = UserInfo('Nguyễn Văn Long Hải',97845165465,123456789,'haf noo')
                 fill_register_form(driver, user_info)
                 time.sleep(10)
 

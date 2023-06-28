@@ -14,6 +14,8 @@ import string
 import time
 import re
 
+from datetime import datetime
+
 import sqlite3
 
 proxy_server = '171.234.58.26:25373'
@@ -106,6 +108,7 @@ def init_user_info(file_path):
 
 
 def save_record_to_database(record):
+    now = datetime.now()
     # Connect to the database (create a new one if it doesn't exist)
     conn = sqlite3.connect('database.db')
 
@@ -120,14 +123,33 @@ def save_record_to_database(record):
                         pwd_login TEXT,
                         pwd_money TEXT,
                         url_web TEXT,
-                        pwd_bank_account INTEGER,
-                        pwd_bank_branch TEXT,
+                        bank_account INTEGER,
+                        bank_branch TEXT,
                         name TEXT,
                         phone TEXT
                     )''')
 
     # Insert the record into the table
-    cursor.execute("INSERT INTO records (name, age) VALUES (?, ?)", (record['name'], record['age']))
+    cursor.execute("""INSERT INTO users (
+        time_created,
+        username,
+        pwd_login,
+        pwd_money,
+        url_web,
+        bank_account,
+        bank_branch,
+        name,
+        phone
+        ) VALUES (?, ?, ?,?,?,?,?,?,?)""", (now,
+                                            user['username'],
+                                            user['pwd_login'],
+                                            user['pwd_money'],
+                                            user['url_web'],
+                                            user['bank_account'],
+                                            user['bank_branch'],
+                                            user['name'],
+                                            user['phone']
+                                            ))
 
     # Commit the changes
     conn.commit()
@@ -175,8 +197,7 @@ def fill_register_form(driver, user_info):
                     for span in spans:
                         if user_info.username in span.text:
                             # saved to database
-                            record = {'name': 'John Doe', 'age': 30}
-                            save_record_to_database(record)
+                            save_record_to_database(user_info)
                             return True
                     
                     return False

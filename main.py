@@ -79,7 +79,6 @@ def fill_register_form(driver, user_info):
                     form.submit()
                     time.sleep(2)
 
-
 def open_register_form(driver, url_register):
     driver.get(url_register)
     time.sleep(2)

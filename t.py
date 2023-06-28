@@ -1,6 +1,7 @@
-import openpyxl
-dataframe = openpyxl.load_workbook('users.xlsx')
-dataframe1 = dataframe.active
-for row in range(0, dataframe1.max_row):
-    for col in dataframe1.iter_cols(1, dataframe1.max_column):
-        print(col[row].value)
+import random
+import string
+
+def generate_password(length=8):
+    characters = string.ascii_letters + string.digits + string.punctuation
+    password = ''.join(random.choice(characters) for _ in range(length))
+    return password

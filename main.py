@@ -14,6 +14,8 @@ import string
 import time
 import re
 
+import sqlite3
+
 proxy_server = '171.234.58.26:25373'
 path_to_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 pytesseract.tesseract_cmd = path_to_tesseract
@@ -101,6 +103,33 @@ def init_user_info(file_path):
     for row in range(0, dataframe1.max_row):
         for col in dataframe1.iter_cols(1, dataframe1.max_column):
             print(col[row].value)
+
+
+def save_record_to_database(record):
+    # Connect to the database (create a new one if it doesn't exist)
+    conn = sqlite3.connect('database.db')
+
+    # Create a cursor object
+    cursor = conn.cursor()
+
+    # Create a table if it doesn't exist
+    cursor.execute('''CREATE TABLE IF NOT EXISTS records (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT,
+                        age INTEGER
+                    )''')
+
+    # Insert the record into the table
+    cursor.execute("INSERT INTO records (name, age) VALUES (?, ?)", (record['name'], record['age']))
+
+    # Commit the changes
+    conn.commit()
+
+    # Close the cursor and the database connection
+    cursor.close()
+    conn.close()
+
+    
 def fill_register_form(driver, user_info):
     username = user_info.get_username()
     pwd_login = user_info.get_pwd_login()
@@ -138,6 +167,9 @@ def fill_register_form(driver, user_info):
                     spans = driver.find_elements(By.TAG_NAME, 'span')
                     for span in spans:
                         if user_info.username in span.text:
+                            # saved to database
+                            record = {'name': 'John Doe', 'age': 30}
+                            save_record_to_database(record)
                             return True
                     
                     return False

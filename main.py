@@ -11,10 +11,8 @@ import base64
 import random
 import string
 
-
 import time
 import re
-
 
 proxy_server = '171.234.58.26:25373'
 path_to_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -77,8 +75,6 @@ class UserInfo:
         self.bank_branch = bank_branch
 
         self.registed = []
- 
-
 
 def init_driver(proxy_server):
 
@@ -93,7 +89,6 @@ def init_webs(file_path):
     f = open(file_path)
     for line in f:
         webs.append(line)
-    
     return webs
 def init_user_info(file_path):
     users_info = []
@@ -139,8 +134,6 @@ def fill_register_form(driver, user_info):
                     
                     return False
 
-
-
 def open_register_form(driver, url_register):
     driver.get(url_register)
     time.sleep(2)
@@ -169,7 +162,6 @@ def open_register_form(driver, url_register):
                 return True
     except:
         return False
-
 
 if __name__ == "__main__":
     driver = init_driver(proxy_server)

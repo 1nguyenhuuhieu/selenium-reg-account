@@ -130,8 +130,16 @@ def fill_register_form(driver, user_info):
                     input.send_keys(text)
                     time.sleep(2)
                     form = driver.find_element(By.TAG_NAME, 'form')
-                    # form.submit()
-                    time.sleep(200)
+                    form.submit()
+                    time.sleep(10)
+                    spans = driver.find_elements(By.TAG_NAME, 'span')
+                    for span in spans:
+                        if user_info.username in span.text:
+                            return True
+                    
+                    return False
+
+
 
 def open_register_form(driver, url_register):
     driver.get(url_register)

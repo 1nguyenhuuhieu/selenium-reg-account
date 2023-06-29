@@ -14,11 +14,22 @@ import sqlite3
 import pandas as pd
 import requests
 import multiprocessing as mp
-tmp_proxy_apikey = 'a37a0d79fe6df60b9ffc7b3eec6de257'
+import configparser
+
 url_new_proxy = "https://tmproxy.com/api/proxy/get-new-proxy"
 url_current_proxy = "https://tmproxy.com/api/proxy/get-current-proxy"
 path_to_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 pytesseract.tesseract_cmd = path_to_tesseract
+
+
+
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+tmp_proxy_apikey = config.get('CONFIG', 'api_key')
+file_user_path = config.get('CONFIG', 'user_info')
+file_webs_path = config.get('CONFIG', 'webs')
+
 
 
 
@@ -282,9 +293,7 @@ def auto_register(url_web, user_info):
     driver.quit()
     time.sleep(2)
 if __name__ == "__main__":
-    file_user_path = 'users.xlsx'
     users = excel_to_dictionary(file_user_path)
-    file_webs_path = 'webs.txt'
     webs = file_to_list(file_webs_path)
     num_processes = len(webs)
     for user_info in users:

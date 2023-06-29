@@ -145,10 +145,12 @@ class UserInfo:
 def init_driver(proxy_server):
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument('--ignore-certificate-errors')
     if proxy_server:
         chrome_options.add_argument('--proxy-server=' + proxy_server)
     else:
         print("Sử dụng IP thật")
+        
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 

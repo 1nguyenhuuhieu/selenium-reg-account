@@ -20,6 +20,8 @@ url_current_proxy = "https://tmproxy.com/api/proxy/get-current-proxy"
 path_to_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 pytesseract.tesseract_cmd = path_to_tesseract
 
+
+
 def get_proxy():
     new_proxy_json = {
     "api_key": tmp_proxy_apikey,

@@ -1,0 +1,3 @@
+text_input: hieu
+boolean_input: True
+select_input: Option 2

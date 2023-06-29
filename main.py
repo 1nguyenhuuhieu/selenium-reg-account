@@ -15,6 +15,7 @@ import pandas as pd
 import requests
 import multiprocessing as mp
 import configparser
+import pandas as pd
 
 url_new_proxy = "https://tmproxy.com/api/proxy/get-new-proxy"
 url_current_proxy = "https://tmproxy.com/api/proxy/get-current-proxy"
@@ -26,9 +27,9 @@ pytesseract.tesseract_cmd = path_to_tesseract
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-tmp_proxy_apikey = config.get('CONFIG', 'api_key')
-file_user_path = config.get('CONFIG', 'user_info')
-file_webs_path = config.get('CONFIG', 'webs')
+tmp_proxy_apikey = config.get('SETTINGS', 'api_key')
+file_user_path = config.get('SETTINGS', 'user_info')
+file_webs_path = config.get('SETTINGS', 'webs')
 
 
 
@@ -97,24 +98,44 @@ def no_accent_vietnamese(s):
 def remove_spaces(string):
     return string.replace(" ", "")
 
-def generate_username(name):
-    username = ''
-    name = name.lower()
-    names = reversed(name.split(' '))
-    for index, name in enumerate(names):
-        if index == 0:
-            username += name
-        else:
-            username += name[0]
-    number =  random.randint(100, 1000)
-    username += str(number)
+
+# Random username
+def generate_username():
+    first_name_list = ["red", "blue", "green", "orange",
+                       "white", "black", "yellow", "purple", "silver", "brown"]
+    last_name_list = ["Dog", "Cow", "Cat", "Horse", "Donkey", "Tiger", "Lion", "Panther", "Leopard", "Cheetah", "Bear", "Elephant", "Polar", "bear", "Turtle", "Tortoise", "Crocodile", "Rabbit", "Porcupine",
+                      "Hare", "Hen", "Pigeon", "Albatross", "Crow", "Fish", "Dolphin", "Frog", "Whale", "Alligator",
+                      "Eagle", "Flying", "squirrel", "Ostrich", "Fox",
+                      "Goat", "Jackal", "Emu", "Armadillo",
+                      "Eel", "Goose", "Arctic", "fox", "Wolf",
+                      "Beagle", "Gorilla", "Chimpanzee", "Monkey",
+                      "Beaver", "Orangutan", "Antelope", "Bat",
+                      "Badger", "Giraffe", "Hermit", "Crab", "Giant", "Panda",
+                      "Hamster", "Cobra", "Hammerhead", "shark", "Camel",
+                      "Hawk", "Deer", "Chameleon",	"Hippopotamus",
+                      "Jaguar", "Chihuahua", "King", "Cobra", "Ibex",
+                      "Lizard", "Koala", "Kangaroo", "Iguana",
+                      "Llama", "Chinchillas", "Dodo", "Jellyfish",
+                      "Rhinoceros", "Hedgehog", "Zebra", "Possum",
+                      "Wombat", "Bison", "Bull", "Buffalo",
+                      "Sheep", "Meerkat", "Mouse", "Otter",
+                      "Sloth", "Owl", "Vulture", "Flamingo",
+                      "Racoon", "Mole", "Duck", "Swan",
+                      "Lynx", "Monitor", "lizard", "Elk", "Boar",
+                      "Lemur", "Mule", "Baboon", "Mammoth",
+                      "Blue", "whale", "Rat", "Snake", "Peacock"]
+    username = random.choice(first_name_list) + random.choice(
+        last_name_list) + str(random.randint(100, 999))
+    username = username.lower()
+
     return username
+
 
 class UserInfo:
     def __init__(self, name, phone, bank_account, bank_branch):
         clear_name = no_accent_vietnamese(name)
         self.name = clear_name.upper()
-        self.username = generate_username(clear_name.lower())
+        self.username = generate_username()
         self.phone = phone
         self.bank_account = bank_account
         self.bank_branch = bank_branch

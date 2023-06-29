@@ -22,7 +22,7 @@ import pandas as pd
 
 import requests
 
-proxy_server = '116.106.179.89:6241'
+import multiprocessing as mp
 
 
 tmp_proxy_apikey = 'a37a0d79fe6df60b9ffc7b3eec6de257'
@@ -221,37 +221,45 @@ def click_element(driver, tag_name, attribute_name, value):
         return False
     
 def fill_register_form(driver, user):
-    inputs = driver.find_elements(By.TAG_NAME, 'input')
-    for input in inputs:
-        if input.get_attribute('ng-model') == '$ctrl.user.account.value':
-            input.send_keys(user.username)
-        if input.get_attribute('ng-model') == '$ctrl.user.password.value':
-            input.send_keys(user.pwd_login)
-        if input.get_attribute('ng-model') == '$ctrl.user.confirmPassword.value':
-            input.send_keys(user.pwd_login)
-        if input.get_attribute('ng-model') == '$ctrl.user.moneyPassword.value':
-            input.send_keys(user.pwd_money)
-        if input.get_attribute('ng-model') == '$ctrl.user.name.value':
-            input.send_keys(user.name)
-        if input.get_attribute('ng-model') == '$ctrl.user.mobile.value':
-            input.send_keys(user.phone)
-        if input.get_attribute('ng-model') == '$ctrl.code':
-            input.click()
-            time.sleep(2)
-            imgs = driver.find_elements(By.TAG_NAME, 'img')
-            for img in imgs:
-                if img.get_attribute('ng-class') == '$ctrl.styles.captcha':
-                    data_url = img.get_attribute('src')
-                    img = load_image_from_base64(data_url)
-                    text = pytesseract.image_to_string(img)
-                    text = text[0:4]
-                    input.send_keys(text)
-                    time.sleep(2)
-                    form = driver.find_element(By.TAG_NAME, 'form')
-                    form.submit()
-                    time.sleep(2)
-                    break
-
+    form_submit = None
+    forms = driver.find_elements(By.TAG_NAME, 'form')
+    for form in forms:
+        if form.get_attribute('ng-submit') == '$ctrl.submit()':
+            form_submit = form
+    
+    if form_submit:
+        inputs = form_submit.find_elements(By.TAG_NAME, 'input')
+        for input in inputs:
+            if input.get_attribute('ng-model') == '$ctrl.user.account.value':
+                input.send_keys(user.username)
+            if input.get_attribute('ng-model') == '$ctrl.user.password.value':
+                input.send_keys(user.pwd_login)
+            if input.get_attribute('ng-model') == '$ctrl.user.confirmPassword.value':
+                input.send_keys(user.pwd_login)
+            if input.get_attribute('ng-model') == '$ctrl.user.moneyPassword.value':
+                input.send_keys(user.pwd_money)
+            if input.get_attribute('ng-model') == '$ctrl.user.name.value':
+                input.send_keys(user.name)
+            if input.get_attribute('ng-model') == '$ctrl.user.mobile.value':
+                input.send_keys(user.phone)
+            if input.get_attribute('ng-model') == '$ctrl.code':
+                input.click()
+                time.sleep(2)
+                imgs = form_submit.find_elements(By.TAG_NAME, 'img')
+                for img in imgs:
+                    if img.get_attribute('ng-class') == '$ctrl.styles.captcha':
+                        data_url = img.get_attribute('src')
+                        img = load_image_from_base64(data_url)
+                        text = pytesseract.image_to_string(img)
+                        text = text[0:4]
+                        input.send_keys(text)
+                        time.sleep(3)
+                        form_submit.submit()
+                        time.sleep(2)
+                        break
+    else:
+            return False
+        
 
 def check_register_success(driver):
     driver.refresh()
@@ -264,8 +272,6 @@ def check_register_success(driver):
             return False
     
     return True
-    
-
 
 def open_register_form(driver, url_register):
     driver.get(url_register)
@@ -279,54 +285,65 @@ def append_to_file(file_path, content):
     with open(file_path, 'a') as file:
         file.write(content + '\n')
 
+def auto_register(url_web, user_info):
+    proxy_server = get_proxy()
+    driver = init_driver(proxy_server)
+    print(f'Khởi tạo driver mới, proxy: {proxy_server}')
+    print(f'{url_web} --- Bắt đầu đăng kí tài khoản: {user_info["name"]}. Số tài khoản: {user_info["bank_account"]}')
+    try:
+        is_register_success = False
+        limit_try = 10
+        while limit_try > 0 and not is_register_success:
+            open_register_form(driver, url_web)
+            limit_try -= 1
+            try:
+                user = UserInfo(user_info['name'],
+                                str(user_info['phone']),
+                                str(user_info['bank_account']),
+                                user_info['bank']
+                                )
+                fill_register_form(driver, user)
+                time.sleep(2)
+                is_register_success = check_register_success(driver) 
+                if is_register_success:
+                    print(f'{url_web} --- Đăng kí thành công tài khoản {user.username}, mật khẩu đăng nhập: {user.pwd_login}, mật khẩu rút tiền: {user.pwd_money}')
+                    time.sleep(2)
+                    # saved to database
+                    try:
+                        save_record_to_database(user, url_web)
+                    except:
+                        pass
+                    break
+                time.sleep(2)
+            except:
+                open_register_form(driver, url_web)
+    except:
+        now = datetime.now()
+        now = now.strftime("%d/%m/%Y %H:%M")
 
+        print(f'Lỗi khi đăng ký: {url_web}')
+        log = f"Timestamp: {now}; Web: {url_web}; Name: {user_info['name']}; Phone: {user_info['phone']}; Bank Account: {user_info['bank_account']}; Bank Branch: {user_info['bank']}"
+        file_path = 'errors.txt'
+        append_to_file(file_path, log)
+    driver.quit()
+    time.sleep(2)
+       
 if __name__ == "__main__":
+
     file_user_path = 'users.xlsx'
     users = excel_to_dictionary(file_user_path)
 
     file_webs_path = 'webs.txt'
     webs = file_to_list(file_webs_path)
+    num_processes = len(webs)
+
 
     for user_info in users:
-        proxy_server = get_proxy()
-        for url_web in webs:
-            driver = init_driver(proxy_server)
-            print(f'Khởi tạo driver mới, proxy: {proxy_server}')
-            print(f'{url_web} --- Bắt đầu đăng kí tài khoản: {user_info["name"]}. Số tài khoản: {user_info["bank_account"]}')
-            try:
-                is_register_success = False
-                limit_try = 10
-                while limit_try > 0 and not is_register_success:
-                    open_register_form(driver, url_web)
-                    print(f'Thử đăng kí lần {11-limit_try}')
-                    limit_try -= 1
-                    try:
-                        user = UserInfo(user_info['name'],
-                                        str(user_info['phone']),
-                                        str(user_info['bank_account']),
-                                        user_info['bank']
-                                        )
-                        fill_register_form(driver, user)
-                        time.sleep(2)
-                        is_register_success = check_register_success(driver) 
-                        if is_register_success:
-                            print(f'[{url_web}] Đăng kí thành công tài khoản {user.username}, mật khẩu đăng nhập: {user.pwd_login}, mật khẩu rút tiền: {user.pwd_money}')
-                            time.sleep(2)
-                            # saved to database
-                            try:
-                                save_record_to_database(user, url_web)
-                                print('Ghi vào database thành công')
-                            except:
-                                print('Lỗi khi ghi vào database')
-                            break
-                        time.sleep(2)
-                    except:
-                        open_register_form(driver, url_web)
-            except:
-                print(f'Lỗi khi đăng ký: {url_web}')
-                file_path = 'errors.txt'
-                append_to_file(file_path, url_web)
-            driver.quit()
-            time.sleep(2)
-       
-        time.sleep(1)
+        arguments = []
+        for web in webs:
+            argument = (web, user_info)
+            arguments.append(argument)
+        pool = mp.Pool(processes=num_processes)
+        pool.starmap(auto_register, arguments)
+        pool.close()
+        pool.join()

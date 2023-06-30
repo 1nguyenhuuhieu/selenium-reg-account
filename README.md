@@ -1,4 +1,6 @@
 # Tự động đăng kí tài khoản
+## 1. Giới thiệu
+Tool tự động 
 Danh sách trang web đã test:
 * https://www.69vn1.com/
 * https://0123win.com/

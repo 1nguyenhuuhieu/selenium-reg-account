@@ -103,29 +103,8 @@ def remove_spaces(string):
 def generate_username():
     first_name_list = ["red", "blue", "green", "orange",
                        "white", "black", "yellow", "purple", "silver", "brown"]
-    last_name_list = ["Dog", "Cow", "Cat", "Horse", "Donkey", "Tiger", "Lion", "Panther", "Leopard", "Cheetah", "Bear", "Elephant", "Polar", "bear", "Turtle", "Tortoise", "Crocodile", "Rabbit", "Porcupine",
-                      "Hare", "Hen", "Pigeon", "Albatross", "Crow", "Fish", "Dolphin", "Frog", "Whale", "Alligator",
-                      "Eagle", "Flying", "squirrel", "Ostrich", "Fox",
-                      "Goat", "Jackal", "Emu", "Armadillo",
-                      "Eel", "Goose", "Arctic", "fox", "Wolf",
-                      "Beagle", "Gorilla", "Chimpanzee", "Monkey",
-                      "Beaver", "Orangutan", "Antelope", "Bat",
-                      "Badger", "Giraffe", "Hermit", "Crab", "Giant", "Panda",
-                      "Hamster", "Cobra", "Hammerhead", "shark", "Camel",
-                      "Hawk", "Deer", "Chameleon",	"Hippopotamus",
-                      "Jaguar", "Chihuahua", "King", "Cobra", "Ibex",
-                      "Lizard", "Koala", "Kangaroo", "Iguana",
-                      "Llama", "Chinchillas", "Dodo", "Jellyfish",
-                      "Rhinoceros", "Hedgehog", "Zebra", "Possum",
-                      "Wombat", "Bison", "Bull", "Buffalo",
-                      "Sheep", "Meerkat", "Mouse", "Otter",
-                      "Sloth", "Owl", "Vulture", "Flamingo",
-                      "Racoon", "Mole", "Duck", "Swan",
-                      "Lynx", "Monitor", "lizard", "Elk", "Boar",
-                      "Lemur", "Mule", "Baboon", "Mammoth",
-                      "Blue", "whale", "Rat", "Snake", "Peacock"]
-    username = random.choice(first_name_list) + random.choice(
-        last_name_list) + str(random.randint(100, 999))
+
+    username = random.choice(first_name_list) + str(random.randint(1000, 9999))
     username = username.lower()
 
     return username
@@ -177,7 +156,8 @@ def save_record_to_database(user, url_web):
                         bank_account TEXT,
                         bank_branch TEXT,
                         name TEXT,
-                        phone TEXT
+                        phone TEXT,
+                        is_add_bank BOOLEAN
                     )''')
     # Insert the record into the table
     cursor.execute("""INSERT INTO users (
@@ -189,8 +169,9 @@ def save_record_to_database(user, url_web):
         bank_account,
         bank_branch,
         name,
-        phone
-        ) VALUES (?,?,?,?,?,?,?,?,?)""", (now,
+        phone,
+        is_add_bank
+        ) VALUES (?,?,?,?,?,?,?,?,?,?)""", (now,
                                         user.username,
                                         user.pwd_login,
                                         user.pwd_money,
@@ -198,25 +179,28 @@ def save_record_to_database(user, url_web):
                                         user.bank_account,
                                         user.bank_branch,
                                         user.name,
-                                        user.phone))
+                                        user.phone,
+                                        False))
     # Commit the changes
     conn.commit()
     # Close the cursor and the database connection
     cursor.close()
     conn.close()
-def click_element(driver, tag_name, attribute_name, value):
+
+
+def get_element(parrent, tag_name, attribute_name, value):
     try:
-        elms = WebDriverWait(driver, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, tag_name)) 
+        elms = WebDriverWait(parrent, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, tag_name)) 
         for elm in elms:
+            print(elm.get_attribute(attribute_name))
             if elm.get_attribute(attribute_name) == value:
-                try:
-                    elm.click()
-                except:
-                    pass
-                time.sleep(2)
-                return True
+                return elm
+        
+        return None
     except:
-        return False
+        return None
+
+    
 def fill_register_form(driver, user):
     form_submit = None
     forms = driver.find_elements(By.TAG_NAME, 'form')
@@ -258,22 +242,42 @@ def fill_register_form(driver, user):
 def check_register_success(driver):
     driver.refresh()
     time.sleep(2)
-    click_element(driver, "button", "ng-click", "$ctrl.ok()")
-    click_element(driver, "span", "ng-click", "$ctrl.ok()")
+    get_element(driver, "button", "ng-click", "$ctrl.ok()")
+    get_element(driver, "span", "ng-click", "$ctrl.ok()")
     elms = WebDriverWait(driver, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, 'button')) 
     for elm in elms:
         if elm.get_attribute("ng-class") == "$ctrl.styles.reg":
             return False
     return True
+
+
+# Open register form
 def open_register_form(driver, url_register):
     driver.get(url_register)
     time.sleep(2)
-    click_element(driver, "button", "ng-click", "$ctrl.ok()")
-    click_element(driver, "span", "ng-click", "$ctrl.ok()")
-    return click_element(driver, "button", "ng-class", "$ctrl.styles.reg")
+
+    # Click close button
+    close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
+    while close_button:
+        close_button.click()
+        time.sleep(1)
+        close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
+        time.sleep(1)
+
+    reg_button = get_element(driver, 'button', 'ng-class', '$ctrl.styles.reg')
+
+    if reg_button:
+        reg_button.click()
+        return True
+
+    return False
+
+
 def append_to_file(file_path, content):
     with open(file_path, 'a') as file:
         file.write(content + '\n')
+
+
 def auto_register(url_web, user_info):
     proxy_server = get_proxy()
     driver = init_driver(proxy_server)
@@ -315,6 +319,8 @@ def auto_register(url_web, user_info):
         append_to_file(file_path, log)
     driver.quit()
     time.sleep(2)
+
+
 if __name__ == "__main__":
     users = excel_to_dictionary(file_user_path)
     webs = file_to_list(file_webs_path)

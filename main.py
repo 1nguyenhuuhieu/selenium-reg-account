@@ -17,6 +17,8 @@ import multiprocessing as mp
 import configparser
 import pandas as pd
 import sys
+from urllib.parse import urlparse
+from selenium.webdriver.support.ui import Select
 
 url_new_proxy = "https://tmproxy.com/api/proxy/get-new-proxy"
 url_current_proxy = "https://tmproxy.com/api/proxy/get-current-proxy"
@@ -28,12 +30,9 @@ pytesseract.tesseract_cmd = path_to_tesseract
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-tmp_proxy_apikey = config.get('SETTINGS', 'api_key')
-file_user_path = config.get('SETTINGS', 'user_info')
-file_webs_path = config.get('SETTINGS', 'webs')
-
-mode = sys.argv[1]
-
+tmp_proxy_apikey = config.get('DEFAULT', 'api_key')
+file_user_path = config.get('DEFAULT', 'user_info')
+file_webs_path = config.get('DEFAULT', 'webs')
 
 def get_proxy():
     new_proxy_json = {
@@ -139,6 +138,15 @@ def file_to_list(file_path):
         content = file.readlines()
         content = [line.strip() for line in content]
     return content
+
+
+def get_users_from_database():
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.row_factory = sqlite3.Row
+    sql = '''SELECT * FROM users WHERE is_addbank != True OR is_addbank is NULL'''
+    users = cursor.execute(sql).fetchall()
+    return users
 
 def save_record_to_database(user, url_web):
     now = datetime.now()
@@ -273,6 +281,21 @@ def fill_register_form(driver, user):
 
     return None
 
+def fill_login_form(driver, user):
+    username = user['username']
+    pwd_login = user['pwd_login']
+    form_login = get_element(driver, 'form', 'ng-submit', '$ctrl.login()')
+    if form_login:
+        inputs = form_login.find_elements(By.TAG_NAME, 'input')
+        for input in inputs:
+            if input.get_attribute('ng-model') == '$ctrl.user.account.value':
+                input.send_keys(username)
+            if input.get_attribute('ng-model') == '$ctrl.user.password.value':
+                input.send_keys(pwd_login)
+        fill_captcha(form_login)
+
+    return None
+
 
 # Open register form
 # option = '$ctrl.styles.reg' --> Register
@@ -374,10 +397,10 @@ def auto_register(url_web, user_info):
         driver.quit()
         time.sleep(2)
 
-
-def auto_add_bank(url_web, user_info):
+def auto_add_bank(user_info):
     proxy_server = get_proxy()
     driver = init_driver(proxy_server)
+    url_web = user_info['url_web']
     print(f'Khởi tạo driver mới, proxy: {proxy_server}')
     print(f'{url_web} --- Bắt đầu thêm thông tin ngân hàng tài khoản: {user_info["name"]}. Số tài khoản: {user_info["bank_account"]}')
     
@@ -396,26 +419,29 @@ def auto_add_bank(url_web, user_info):
                 open_form(driver, url_web, 'add_bank')
                 limit_try -= 1
                 try:
-                    user = UserInfo(user_info['name'],
-                                    str(user_info['phone']),
-                                    str(user_info['bank_account']),
-                                    user_info['bank']
-                                    )
-                    fill_register_form(driver, user)
-                    time.sleep(2)
+                    fill_login_form(driver, user_info)
                     is_register_success = not get_element(driver, 'button', 'ng-class', '$ctrl.styles.reg')
-                    if is_register_success:
-                        print(f'{url_web} --- Đăng kí thành công tài khoản {user.username}, mật khẩu đăng nhập: {user.pwd_login}, mật khẩu rút tiền: {user.pwd_money}')
-                        time.sleep(2)
-                        # saved to database
-                        try:
-                            save_record_to_database(user, url_web)
-                        except:
-                            pass
-                        break
-                    time.sleep(2)
                 except:
                     pass
+            
+            current_url = driver.current_url
+            parsed_url = urlparse(current_url)
+            base_url = parsed_url.scheme + '://' + parsed_url.netloc
+            add_bank_url = base_url + '/WithdrawApplication'
+            driver.get(add_bank_url)
+            time.sleep(3)
+            form_addbank = get_element(driver, 'form','ng-submit', '$ctrl.onBankAccountSubmit()')
+            if form_addbank:
+                select_bank = get_element(form_addbank, 'select', 'ng-model',"$ctrl.viewModel.bankAccountForm.bankName.value")
+                select = Select(select_bank)
+                select.select_by_visible_text('MBBANK')
+                bank_branch = get_element(form_addbank, 'input', 'ng-model',"$ctrl.viewModel.bankAccountForm.city.value")
+                bank_account = get_element(form_addbank, 'input', 'ng-model',"$ctrl.viewModel.bankAccountForm.account.value")
+
+                bank_branch.send_keys(user_info['bank_branch'])
+                bank_account.send_keys(user_info['bank_account'])
+                
+                time.sleep(2000)
         except:
             now = datetime.now()
             now = now.strftime("%d/%m/%Y %H:%M")
@@ -428,6 +454,8 @@ def auto_add_bank(url_web, user_info):
         
         
 if __name__ == "__main__":
+    mode = sys.argv[1]
+
     if mode == 'reg':
         users = excel_to_dictionary(file_user_path)
         webs = file_to_list(file_webs_path)
@@ -441,3 +469,9 @@ if __name__ == "__main__":
             pool.starmap(auto_register, arguments)
             pool.close()
             pool.join()
+    elif mode == 'add_bank':
+        users = get_users_from_database()
+        for user in users:
+            auto_add_bank(user)
+            time.sleep(2)
+        

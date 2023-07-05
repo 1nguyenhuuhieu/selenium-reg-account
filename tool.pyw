@@ -2,84 +2,106 @@ import tkinter as tk
 from tkinter import filedialog
 import configparser
 import subprocess
+import os
 
+CONFIG_FILE = 'config.ini'
 
 def save_config():
     config = configparser.ConfigParser()
-    config['SETTINGS'] = {
+    config['DEFAULT'] = {
         'api_key': api_key_entry.get(),
         'user_info': user_info_entry.get(),
         'webs': webs_entry.get()
     }
+    with open(CONFIG_FILE, 'w') as configfile:
+        config.write(configfile)
 
-    with open('config.ini', 'w') as config_file:
-        config.write(config_file)
+def load_config():
+    if not os.path.exists(CONFIG_FILE):
+        # Create the config file if it doesn't exist
+        save_config()
 
-    messagebox.showinfo('Success', 'Config file saved successfully.')
+    config = configparser.ConfigParser()
+    config.read(CONFIG_FILE)
+    api_key_entry.delete(0, tk.END)
+    api_key_entry.insert(0, config['DEFAULT']['api_key'])
+    user_info_entry.delete(0, tk.END)
+    user_info_entry.insert(0, config['DEFAULT']['user_info'])
+    webs_entry.delete(0, tk.END)
+    webs_entry.insert(0, config['DEFAULT']['webs'])
 
+def run_main_py(arg):
+    subprocess.run(['python', 'main.py', arg])
 
-def choose_file(entry):
+def choose_user_info_file():
     filename = filedialog.askopenfilename()
-    entry.delete(0, tk.END)
-    entry.insert(tk.END, filename)
+    user_info_entry.delete(0, tk.END)
+    user_info_entry.insert(0, filename)
 
+def choose_webs_file():
+    filename = filedialog.askopenfilename()
+    webs_entry.delete(0, tk.END)
+    webs_entry.insert(0, filename)
 
-def run_main():
-    subprocess.run(['python', 'main.py', 'reg'])
-
-
-# Create the main Tkinter window
 root = tk.Tk()
-root.title('Config App')
+root.title("Auto Reg Account Web Game")
 
-# Define the responsive dimensions
-width = root.winfo_screenwidth() * 0.5
-height = root.winfo_screenheight() * 0.5
+# Configure grid column and row weights
+root.grid_columnconfigure(1, weight=1)
+root.grid_rowconfigure(4, weight=1)
 
-# Set the window dimensions and position it in the center
-root.geometry(f'{int(width)}x{int(height)}+{int((root.winfo_screenwidth() - width) / 2)}+{int((root.winfo_screenheight() - height) / 2)}')
-
-# Create the API Key label and entry field
-api_key_label = tk.Label(root, text='API Key:')
-api_key_label.pack()
-
+# API key field
+api_key_label = tk.Label(root, text="API key:")
+api_key_label.grid(row=0, column=0)
 api_key_entry = tk.Entry(root)
-api_key_entry.pack()
+api_key_entry.grid(row=0, column=1, sticky="ew")
 
-# Create the User Info label, entry field, and file chooser button
-user_info_label = tk.Label(root, text='User Info:')
-user_info_label.pack()
-
+# User info field
+user_info_label = tk.Label(root, text="User info:")
+user_info_label.grid(row=1, column=0)
 user_info_entry = tk.Entry(root)
-user_info_entry.pack()
+user_info_entry.grid(row=1, column=1, sticky="ew")
+user_info_button = tk.Button(root, text="Choose file", command=choose_user_info_file)
+user_info_button.grid(row=1, column=2)
 
-user_info_button = tk.Button(root, text='Choose File', command=lambda: choose_file(user_info_entry))
-user_info_button.pack()
-
-# Create the Webs label, entry field, and file chooser button
-webs_label = tk.Label(root, text='Webs:')
-webs_label.pack()
-
+# Webs field
+webs_label = tk.Label(root, text="Webs:")
+webs_label.grid(row=2, column=0)
 webs_entry = tk.Entry(root)
-webs_entry.pack()
+webs_entry.grid(row=2, column=1, sticky="ew")
+webs_button = tk.Button(root, text="Choose file", command=choose_webs_file)
+webs_button.grid(row=2, column=2)
 
-webs_button = tk.Button(root, text='Choose File', command=lambda: choose_file(webs_entry))
-webs_button.pack()
+# Save button
+save_button = tk.Button(root, text="Save", command=save_config)
+save_button.grid(row=3, column=0, sticky="ew")
 
-# Create the Save button
-save_button = tk.Button(root, text='Save', command=save_config)
-save_button.pack()
+# Load button
+load_button = tk.Button(root, text="Load", command=load_config)
+load_button.grid(row=3, column=1, sticky="ew")
 
-# Create the Run button
-run_button = tk.Button(root, text='Run Main', command=run_main)
-run_button.pack()
+# Reg User button
+reg_button = tk.Button(root, text="Reg User", command=lambda: run_main_py('reg'))
+reg_button.grid(row=4, column=0, sticky="ew")
 
-# Load default values from config.ini if it exists
-config = configparser.ConfigParser()
-if 'config.ini' in config.read('config.ini'):
-    api_key_entry.insert(tk.END, config.get('SETTINGS', 'api_key'))
-    user_info_entry.insert(tk.END, config.get('SETTINGS', 'user_info'))
-    webs_entry.insert(tk.END, config.get('SETTINGS', 'webs'))
+# Add Bank button
+add_bank_button = tk.Button(root, text="Add Bank", command=lambda: run_main_py('add_bank'))
+add_bank_button.grid(row=4, column=1, sticky="ew")
 
-# Start the Tkinter event loop
+# Load config on app start
+load_config()
+
+# Author information
+author_info = tk.Label(root, text="Author: Nguyễn Hữu Hiếu")
+author_info.grid(row=5, column=0, columnspan=2, sticky="w")
+email_info = tk.Label(root, text="Email: 1nguyenhuuhieu@gmail.com")
+email_info.grid(row=6, column=0, columnspan=2, sticky="w")
+phone_info = tk.Label(root, text="Phone/Zalo: 0946127555")
+phone_info.grid(row=7, column=0, columnspan=2, sticky="w")
+version_info = tk.Label(root, text="Version: 1.0    Date Created: 05/07/2023")
+version_info.grid(row=8, column=0, columnspan=2, sticky="w")
+
+# Set default width and height
+root.geometry("600x300")
+
 root.mainloop()

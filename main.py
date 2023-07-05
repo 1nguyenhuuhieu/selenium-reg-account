@@ -144,7 +144,7 @@ def get_users_from_database():
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
     cursor.row_factory = sqlite3.Row
-    sql = '''SELECT * FROM users WHERE is_addbank != True OR is_addbank is NULL'''
+    sql = '''SELECT * FROM users WHERE (is_addbank is NULL)'''
     users = cursor.execute(sql).fetchall()
     return users
 
@@ -165,8 +165,7 @@ def save_record_to_database(user, url_web):
                         bank_account TEXT,
                         bank_branch TEXT,
                         name TEXT,
-                        phone TEXT,
-                        is_addbank BOOLEAN
+                        phone TEXT
                     )''')
     # Insert the record into the table
     cursor.execute("""INSERT INTO users (
@@ -180,7 +179,7 @@ def save_record_to_database(user, url_web):
         name,
         phone,
         is_addbank
-        ) VALUES (?,?,?,?,?,?,?,?,?,?)""", (now,
+        ) VALUES (?,?,?,?,?,?,?,?,?)""", (now,
                                         user.username,
                                         user.pwd_login,
                                         user.pwd_money,
@@ -188,8 +187,8 @@ def save_record_to_database(user, url_web):
                                         user.bank_account,
                                         user.bank_branch,
                                         user.name,
-                                        user.phone,
-                                        False))
+                                        user.phone
+                                        ))
     # Commit the changes
     conn.commit()
     # Close the cursor and the database connection
@@ -197,17 +196,19 @@ def save_record_to_database(user, url_web):
     conn.close()
     return None
     
-def update_user_to_database(user):
+def update_user_to_database(user, logic):
     # Connect to the database (create a new one if it doesn't exist)
     conn = sqlite3.connect('database.db')
     # Create a cursor object
     cursor = conn.cursor()
-    cursor.execute("""UPDATE users SET is_addbank = ? WHERE username = ?""", (True, user['username']))
+    cursor.execute("""UPDATE users SET is_addbank = ? WHERE username = ?""", (logic, user['username']))
     # Commit the changes
     conn.commit()
     # Close the cursor and the database connection
     cursor.close()
     conn.close()
+    
+
 
 
 def get_element(parrent, tag_name, attribute_name, value):
@@ -245,11 +246,10 @@ def fill_register_form(driver, user):
 
     return None
 
-def fill_login_form(driver, user):
-    username = user['username']
-    pwd_login = user['pwd_login']
-    form_login = get_element(driver, 'form', 'ng-submit', '$ctrl.login()')
-    if form_login:
+def fill_login_form(form_login, user):
+    try:
+        username = user['username']
+        pwd_login = user['pwd_login']
         inputs = form_login.find_elements(By.TAG_NAME, 'input')
         for input in inputs:
             if input.get_attribute('ng-model') == '$ctrl.user.account.value':
@@ -257,8 +257,13 @@ def fill_login_form(driver, user):
             if input.get_attribute('ng-model') == '$ctrl.user.password.value':
                 input.send_keys(pwd_login)
         fill_captcha(form_login)
+    except:
+        pass
+    
+    
+    
+    return True
 
-    return None
 
 
 # Open register form
@@ -288,7 +293,37 @@ def open_form(driver, url_register, option):
     return False
 
 
-
+def login(driver, user):
+    url = user['url_web']
+    driver.get(url)
+    time.sleep(3)
+    # Click close button
+    close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
+    while close_button:
+        close_button.click()
+        time.sleep(1)
+        close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
+        time.sleep(1)
+        
+    time.sleep(3)
+    
+    form_login = get_element(driver, 'form', 'ng-submit', '$ctrl.login()')
+    limit_try = 5
+    while limit_try > 0 and not form_login:
+        open_form(driver, url, 'login')
+        time.sleep(3)
+        form_login = get_element(driver, 'form', 'ng-submit', '$ctrl.login()')
+        
+    limit_try = 3
+    is_login_success =  False
+    while limit_try > 0 and not is_login_success:
+        limit_try -= 1
+        fill_login_form(form_login, user)
+        time.sleep(2)
+        driver.refresh()
+        time.sleep(2)
+        is_login_success =  get_element(driver, 'span', 'ng-class', '$ctrl.styles.account')
+            
 def append_to_file(file_path, content):
     with open(file_path, 'a') as file:
         file.write(content + '\n')
@@ -367,60 +402,40 @@ def auto_add_bank(user_info):
     url_web = user_info['url_web']
     print(f'Khởi tạo driver mới, proxy: {proxy_server}')
     print(f'{url_web} --- Bắt đầu thêm thông tin ngân hàng tài khoản: {user_info["name"]}. Số tài khoản: {user_info["bank_account"]}')
+
+    login(driver, user_info)
     
-    limit_try = 3
-    is_open_register_form = False
-    while limit_try > 0 and not is_open_register_form:
-        is_open_register_form = open_form(driver, url_web, 'add_bank')
-        limit_try -= 1
+    time.sleep(2)
         
-    # Open register form success    
-    if is_open_register_form:
-        try:
-            is_register_success = False
-            limit_try = 10
-            while limit_try > 0 and not is_register_success:
-                open_form(driver, url_web, 'add_bank')
-                limit_try -= 1
-                try:
-                    fill_login_form(driver, user_info)
-                    is_register_success = not get_element(driver, 'button', 'ng-class', '$ctrl.styles.reg')
-                except:
-                    pass
+    try:
+        current_url = driver.current_url
+        parsed_url = urlparse(current_url)
+        base_url = parsed_url.scheme + '://' + parsed_url.netloc
+        add_bank_url = base_url + '/WithdrawApplication'
+        driver.get(add_bank_url)
+        time.sleep(3)
+        form_addbank = get_element(driver, 'form','ng-submit', '$ctrl.onBankAccountSubmit()')
+        if form_addbank:
+            select_bank = get_element(form_addbank, 'select', 'ng-model',"$ctrl.viewModel.bankAccountForm.bankName.value")
+            select = Select(select_bank)
+            select.select_by_visible_text('MBBANK')
+            bank_branch = get_element(form_addbank, 'input', 'ng-model',"$ctrl.viewModel.bankAccountForm.city.value")
+            bank_account = get_element(form_addbank, 'input', 'ng-model',"$ctrl.viewModel.bankAccountForm.account.value")
+
+            bank_branch.send_keys(user_info['bank_branch'])
+            bank_account.send_keys(user_info['bank_account'])
             
-            current_url = driver.current_url
-            parsed_url = urlparse(current_url)
-            base_url = parsed_url.scheme + '://' + parsed_url.netloc
-            add_bank_url = base_url + '/WithdrawApplication'
-            driver.get(add_bank_url)
-            time.sleep(3)
-            form_addbank = get_element(driver, 'form','ng-submit', '$ctrl.onBankAccountSubmit()')
-            if form_addbank:
-                select_bank = get_element(form_addbank, 'select', 'ng-model',"$ctrl.viewModel.bankAccountForm.bankName.value")
-                select = Select(select_bank)
-                select.select_by_visible_text('MBBANK')
-                bank_branch = get_element(form_addbank, 'input', 'ng-model',"$ctrl.viewModel.bankAccountForm.city.value")
-                bank_account = get_element(form_addbank, 'input', 'ng-model',"$ctrl.viewModel.bankAccountForm.account.value")
-
-                bank_branch.send_keys(user_info['bank_branch'])
-                bank_account.send_keys(user_info['bank_account'])
-                
-                time.sleep(2)
-                form_addbank.submit()
-                time.sleep(2)
-                update_user_to_database(user)
-
-
-        except:
-            now = datetime.now()
-            now = now.strftime("%d/%m/%Y %H:%M")
-            print(f'Lỗi khi đăng ký: {url_web}')
-            log = f"Timestamp: {now}; Web: {url_web}; Name: {user_info['name']}; Phone: {user_info['phone']}; Bank Account: {user_info['bank_account']}; Bank Branch: {user_info['bank']}"
-            file_path = 'errors.txt'
-            append_to_file(file_path, log)
-        driver.quit()
-        time.sleep(2)
-        
+            time.sleep(2)
+            form_addbank.submit()
+            time.sleep(2)
+            update_user_to_database(user, True)
+        else:
+            update_user_to_database(user, False)
+    except:
+        update_user_to_database(user, False)
+    driver.quit()
+    time.sleep(2)
+    
         
 if __name__ == "__main__":
     mode = sys.argv[1]

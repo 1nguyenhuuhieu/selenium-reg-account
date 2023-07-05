@@ -441,7 +441,11 @@ def auto_add_bank(user_info):
                 bank_branch.send_keys(user_info['bank_branch'])
                 bank_account.send_keys(user_info['bank_account'])
                 
-                time.sleep(2000)
+                time.sleep(2)
+                form_addbank.submit()
+                time.sleep(2)
+
+
         except:
             now = datetime.now()
             now = now.strftime("%d/%m/%Y %H:%M")

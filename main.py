@@ -16,6 +16,7 @@ import requests
 import multiprocessing as mp
 import configparser
 import pandas as pd
+import sys
 
 url_new_proxy = "https://tmproxy.com/api/proxy/get-new-proxy"
 url_current_proxy = "https://tmproxy.com/api/proxy/get-current-proxy"
@@ -31,7 +32,7 @@ tmp_proxy_apikey = config.get('SETTINGS', 'api_key')
 file_user_path = config.get('SETTINGS', 'user_info')
 file_webs_path = config.get('SETTINGS', 'webs')
 
-
+mode = sys.argv[1]
 
 
 def get_proxy():
@@ -157,6 +158,55 @@ def save_record_to_database(user, url_web):
                         bank_branch TEXT,
                         name TEXT,
                         phone TEXT,
+                        is_addbank BOOLEAN
+                    )''')
+    # Insert the record into the table
+    cursor.execute("""INSERT INTO users (
+        time_created,
+        username,
+        pwd_login,
+        pwd_money,
+        url_web,
+        bank_account,
+        bank_branch,
+        name,
+        phone,
+        is_addbank
+        ) VALUES (?,?,?,?,?,?,?,?,?,?)""", (now,
+                                        user.username,
+                                        user.pwd_login,
+                                        user.pwd_money,
+                                        url_web,
+                                        user.bank_account,
+                                        user.bank_branch,
+                                        user.name,
+                                        user.phone,
+                                        False))
+    # Commit the changes
+    conn.commit()
+    # Close the cursor and the database connection
+    cursor.close()
+    conn.close()
+    return None
+    
+def update_user_to_database(user, url_web):
+    now = datetime.now()
+    # Connect to the database (create a new one if it doesn't exist)
+    conn = sqlite3.connect('database.db')
+    # Create a cursor object
+    cursor = conn.cursor()
+    # Create a table if it doesn't exist
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        time_created DATETIME,
+                        username TEXT,
+                        pwd_login TEXT,
+                        pwd_money TEXT,
+                        url_web TEXT,
+                        bank_account TEXT,
+                        bank_branch TEXT,
+                        name TEXT,
+                        phone TEXT,
                         is_add_bank BOOLEAN
                     )''')
     # Insert the record into the table
@@ -192,7 +242,6 @@ def get_element(parrent, tag_name, attribute_name, value):
     try:
         elms = WebDriverWait(parrent, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, tag_name)) 
         for elm in elms:
-            print(elm.get_attribute(attribute_name))
             if elm.get_attribute(attribute_name) == value:
                 return elm
         
@@ -202,11 +251,8 @@ def get_element(parrent, tag_name, attribute_name, value):
 
     
 def fill_register_form(driver, user):
-    form_submit = None
-    forms = driver.find_elements(By.TAG_NAME, 'form')
-    for form in forms:
-        if form.get_attribute('ng-submit') == '$ctrl.submit()':
-            form_submit = form
+    
+    form_submit = get_element(driver, 'form', 'ng-submit', '$ctrl.submit()')
     if form_submit:
         inputs = form_submit.find_elements(By.TAG_NAME, 'input')
         for input in inputs:
@@ -222,40 +268,22 @@ def fill_register_form(driver, user):
                 input.send_keys(user.name)
             if input.get_attribute('ng-model') == '$ctrl.user.mobile.value':
                 input.send_keys(user.phone)
-            if input.get_attribute('ng-model') == '$ctrl.code':
-                input.click()
-                time.sleep(2)
-                imgs = form_submit.find_elements(By.TAG_NAME, 'img')
-                for img in imgs:
-                    if img.get_attribute('ng-class') == '$ctrl.styles.captcha':
-                        data_url = img.get_attribute('src')
-                        img = load_image_from_base64(data_url)
-                        text = pytesseract.image_to_string(img)
-                        text = text[0:4]
-                        input.send_keys(text)
-                        time.sleep(3)
-                        form_submit.submit()
-                        time.sleep(2)
-                        break
-    else:
-            return False
-def check_register_success(driver):
-    driver.refresh()
-    time.sleep(2)
-    get_element(driver, "button", "ng-click", "$ctrl.ok()")
-    get_element(driver, "span", "ng-click", "$ctrl.ok()")
-    elms = WebDriverWait(driver, timeout=3).until(lambda d: d.find_elements(By.TAG_NAME, 'button')) 
-    for elm in elms:
-        if elm.get_attribute("ng-class") == "$ctrl.styles.reg":
-            return False
-    return True
+        
+        fill_captcha(form_submit)
+
+    return None
 
 
 # Open register form
-def open_register_form(driver, url_register):
+# option = '$ctrl.styles.reg' --> Register
+# option = '$ctrl.styles.login' --> Login
+def open_form(driver, url_register, option):
+    if option == 'reg':
+        value = '$ctrl.styles.reg'
+    else:
+        value = '$ctrl.styles.login'
     driver.get(url_register)
     time.sleep(2)
-
     # Click close button
     close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
     while close_button:
@@ -264,73 +292,152 @@ def open_register_form(driver, url_register):
         close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
         time.sleep(1)
 
-    reg_button = get_element(driver, 'button', 'ng-class', '$ctrl.styles.reg')
+    button = get_element(driver, 'button', 'ng-class', value)
 
-    if reg_button:
-        reg_button.click()
+    if button:
+        button.click()
         return True
 
     return False
+
 
 
 def append_to_file(file_path, content):
     with open(file_path, 'a') as file:
         file.write(content + '\n')
 
-
+def fill_captcha(form_submit):
+    captcha_input = get_element(form_submit, 'input', 'ng-model', '$ctrl.code')
+    if captcha_input:
+        captcha_input.click()
+        time.sleep(2)
+        img_captcha = get_element(form_submit, 'img', 'ng-class', '$ctrl.styles.captcha')
+        if img_captcha:
+            data_url = img_captcha.get_attribute('src')
+            img = load_image_from_base64(data_url)
+            text = pytesseract.image_to_string(img)
+            text = text[0:4]
+            captcha_input.send_keys(text)
+            form_submit.submit()
+            time.sleep(1)
+            
+    return None
+            
 def auto_register(url_web, user_info):
     proxy_server = get_proxy()
     driver = init_driver(proxy_server)
     print(f'Khởi tạo driver mới, proxy: {proxy_server}')
     print(f'{url_web} --- Bắt đầu đăng kí tài khoản: {user_info["name"]}. Số tài khoản: {user_info["bank_account"]}')
-    try:
-        is_register_success = False
-        limit_try = 10
-        while limit_try > 0 and not is_register_success:
-            open_register_form(driver, url_web)
-            limit_try -= 1
-            try:
-                user = UserInfo(user_info['name'],
-                                str(user_info['phone']),
-                                str(user_info['bank_account']),
-                                user_info['bank']
-                                )
-                fill_register_form(driver, user)
-                time.sleep(2)
-                is_register_success = check_register_success(driver) 
-                if is_register_success:
-                    print(f'{url_web} --- Đăng kí thành công tài khoản {user.username}, mật khẩu đăng nhập: {user.pwd_login}, mật khẩu rút tiền: {user.pwd_money}')
+    
+    limit_try = 3
+    is_open_register_form = False
+    while limit_try > 0 and not is_open_register_form:
+        is_open_register_form = open_form(driver, url_web, 'reg')
+        limit_try -= 1
+        
+    # Open register form success    
+    if is_open_register_form:
+        try:
+            is_register_success = False
+            limit_try = 10
+            while limit_try > 0 and not is_register_success:
+                open_form(driver, url_web, 'reg')
+                limit_try -= 1
+                try:
+                    user = UserInfo(user_info['name'],
+                                    str(user_info['phone']),
+                                    str(user_info['bank_account']),
+                                    user_info['bank']
+                                    )
+                    fill_register_form(driver, user)
                     time.sleep(2)
-                    # saved to database
-                    try:
-                        save_record_to_database(user, url_web)
-                    except:
-                        pass
-                    break
-                time.sleep(2)
-            except:
-                open_register_form(driver, url_web)
-    except:
-        now = datetime.now()
-        now = now.strftime("%d/%m/%Y %H:%M")
-        print(f'Lỗi khi đăng ký: {url_web}')
-        log = f"Timestamp: {now}; Web: {url_web}; Name: {user_info['name']}; Phone: {user_info['phone']}; Bank Account: {user_info['bank_account']}; Bank Branch: {user_info['bank']}"
-        file_path = 'errors.txt'
-        append_to_file(file_path, log)
-    driver.quit()
-    time.sleep(2)
+                    is_register_success = not get_element(driver, 'button', 'ng-class', '$ctrl.styles.reg')
+                    if is_register_success:
+                        print(f'{url_web} --- Đăng kí thành công tài khoản {user.username}, mật khẩu đăng nhập: {user.pwd_login}, mật khẩu rút tiền: {user.pwd_money}')
+                        time.sleep(2)
+                        # saved to database
+                        try:
+                            save_record_to_database(user, url_web)
+                        except:
+                            pass
+                        break
+                    time.sleep(2)
+                except:
+                    pass
+        except:
+            now = datetime.now()
+            now = now.strftime("%d/%m/%Y %H:%M")
+            print(f'Lỗi khi đăng ký: {url_web}')
+            log = f"Timestamp: {now}; Web: {url_web}; Name: {user_info['name']}; Phone: {user_info['phone']}; Bank Account: {user_info['bank_account']}; Bank Branch: {user_info['bank']}"
+            file_path = 'errors.txt'
+            append_to_file(file_path, log)
+        driver.quit()
+        time.sleep(2)
 
 
+def auto_add_bank(url_web, user_info):
+    proxy_server = get_proxy()
+    driver = init_driver(proxy_server)
+    print(f'Khởi tạo driver mới, proxy: {proxy_server}')
+    print(f'{url_web} --- Bắt đầu thêm thông tin ngân hàng tài khoản: {user_info["name"]}. Số tài khoản: {user_info["bank_account"]}')
+    
+    limit_try = 3
+    is_open_register_form = False
+    while limit_try > 0 and not is_open_register_form:
+        is_open_register_form = open_form(driver, url_web, 'add_bank')
+        limit_try -= 1
+        
+    # Open register form success    
+    if is_open_register_form:
+        try:
+            is_register_success = False
+            limit_try = 10
+            while limit_try > 0 and not is_register_success:
+                open_form(driver, url_web, 'add_bank')
+                limit_try -= 1
+                try:
+                    user = UserInfo(user_info['name'],
+                                    str(user_info['phone']),
+                                    str(user_info['bank_account']),
+                                    user_info['bank']
+                                    )
+                    fill_register_form(driver, user)
+                    time.sleep(2)
+                    is_register_success = not get_element(driver, 'button', 'ng-class', '$ctrl.styles.reg')
+                    if is_register_success:
+                        print(f'{url_web} --- Đăng kí thành công tài khoản {user.username}, mật khẩu đăng nhập: {user.pwd_login}, mật khẩu rút tiền: {user.pwd_money}')
+                        time.sleep(2)
+                        # saved to database
+                        try:
+                            save_record_to_database(user, url_web)
+                        except:
+                            pass
+                        break
+                    time.sleep(2)
+                except:
+                    pass
+        except:
+            now = datetime.now()
+            now = now.strftime("%d/%m/%Y %H:%M")
+            print(f'Lỗi khi đăng ký: {url_web}')
+            log = f"Timestamp: {now}; Web: {url_web}; Name: {user_info['name']}; Phone: {user_info['phone']}; Bank Account: {user_info['bank_account']}; Bank Branch: {user_info['bank']}"
+            file_path = 'errors.txt'
+            append_to_file(file_path, log)
+        driver.quit()
+        time.sleep(2)
+        
+        
 if __name__ == "__main__":
-    users = excel_to_dictionary(file_user_path)
-    webs = file_to_list(file_webs_path)
-    num_processes = len(webs)
-    for user_info in users:
-        arguments = []
-        for web in webs:
-            argument = (web, user_info)
-            arguments.append(argument)
-        pool = mp.Pool(processes=num_processes)
-        pool.starmap(auto_register, arguments)
-        pool.close()
-        pool.join()
+    if mode == 'reg':
+        users = excel_to_dictionary(file_user_path)
+        webs = file_to_list(file_webs_path)
+        num_processes = len(webs)
+        for user_info in users:
+            arguments = []
+            for web in webs:
+                argument = (web, user_info)
+                arguments.append(argument)
+            pool = mp.Pool(processes=num_processes)
+            pool.starmap(auto_register, arguments)
+            pool.close()
+            pool.join()

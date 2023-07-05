@@ -25,7 +25,7 @@ def choose_file(entry):
 
 
 def run_main():
-    subprocess.run(['python', 'main.py'])
+    subprocess.run(['python', 'main.py', 'reg'])
 
 
 # Create the main Tkinter window

@@ -197,48 +197,12 @@ def save_record_to_database(user, url_web):
     conn.close()
     return None
     
-def update_user_to_database(user, url_web):
-    now = datetime.now()
+def update_user_to_database(user):
     # Connect to the database (create a new one if it doesn't exist)
     conn = sqlite3.connect('database.db')
     # Create a cursor object
     cursor = conn.cursor()
-    # Create a table if it doesn't exist
-    cursor.execute('''CREATE TABLE IF NOT EXISTS users (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        time_created DATETIME,
-                        username TEXT,
-                        pwd_login TEXT,
-                        pwd_money TEXT,
-                        url_web TEXT,
-                        bank_account TEXT,
-                        bank_branch TEXT,
-                        name TEXT,
-                        phone TEXT,
-                        is_add_bank BOOLEAN
-                    )''')
-    # Insert the record into the table
-    cursor.execute("""INSERT INTO users (
-        time_created,
-        username,
-        pwd_login,
-        pwd_money,
-        url_web,
-        bank_account,
-        bank_branch,
-        name,
-        phone,
-        is_add_bank
-        ) VALUES (?,?,?,?,?,?,?,?,?,?)""", (now,
-                                        user.username,
-                                        user.pwd_login,
-                                        user.pwd_money,
-                                        url_web,
-                                        user.bank_account,
-                                        user.bank_branch,
-                                        user.name,
-                                        user.phone,
-                                        False))
+    cursor.execute("""UPDATE users SET is_addbank = ? WHERE username = ?""", (True, user['username']))
     # Commit the changes
     conn.commit()
     # Close the cursor and the database connection
@@ -444,6 +408,7 @@ def auto_add_bank(user_info):
                 time.sleep(2)
                 form_addbank.submit()
                 time.sleep(2)
+                update_user_to_database(user)
 
 
         except:

@@ -130,7 +130,7 @@ def init_driver(proxy_server):
     else:
         print("Sử dụng IP thật")
         
-    driver = webdriver.Chrome(options=chrome_options)
+    driver = webdriver.Firefox()
     return driver
 
 def file_to_list(file_path):

@@ -19,6 +19,7 @@ import pandas as pd
 import sys
 from urllib.parse import urlparse
 from selenium.webdriver.support.ui import Select
+from selenium.webdriver.chrome.service import Service as ChromeService
 
 url_new_proxy = "https://tmproxy.com/api/proxy/get-new-proxy"
 url_current_proxy = "https://tmproxy.com/api/proxy/get-current-proxy"
@@ -122,6 +123,7 @@ class UserInfo:
         self.pwd_money = str(random.randint(10000000, 100000000))
 
 def init_driver(proxy_server):
+    chrome_driver_path = 'chromedriver'
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument('--ignore-certificate-errors')
@@ -129,8 +131,8 @@ def init_driver(proxy_server):
         chrome_options.add_argument('--proxy-server=' + proxy_server)
     else:
         print("Sử dụng IP thật")
-        
-    driver = webdriver.Firefox()
+    service = ChromeService(executable_path=chrome_driver_path)
+    driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
 def file_to_list(file_path):
@@ -165,7 +167,8 @@ def save_record_to_database(user, url_web):
                         bank_account TEXT,
                         bank_branch TEXT,
                         name TEXT,
-                        phone TEXT
+                        phone TEXT,
+                        is_addbank BOOLEAN
                     )''')
     # Insert the record into the table
     cursor.execute("""INSERT INTO users (
@@ -179,7 +182,7 @@ def save_record_to_database(user, url_web):
         name,
         phone,
         is_addbank
-        ) VALUES (?,?,?,?,?,?,?,?,?)""", (now,
+        ) VALUES (?,?,?,?,?,?,?,?,?,?)""", (now,
                                         user.username,
                                         user.pwd_login,
                                         user.pwd_money,
@@ -187,10 +190,12 @@ def save_record_to_database(user, url_web):
                                         user.bank_account,
                                         user.bank_branch,
                                         user.name,
-                                        user.phone
+                                        user.phone,
+                                        False
                                         ))
     # Commit the changes
     conn.commit()
+    print('SAVE RECORD TO DATABASE DEBUG 4')
     # Close the cursor and the database connection
     cursor.close()
     conn.close()
@@ -379,8 +384,10 @@ def auto_register(url_web, user_info):
                         time.sleep(2)
                         # saved to database
                         try:
+                            print('Try to save to database')	
                             save_record_to_database(user, url_web)
                         except:
+                            print('Except to save to database')
                             pass
                         break
                     time.sleep(2)

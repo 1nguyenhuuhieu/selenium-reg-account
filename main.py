@@ -146,7 +146,7 @@ def get_users_from_database():
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
     cursor.row_factory = sqlite3.Row
-    sql = '''SELECT * FROM users WHERE (is_addbank is NULL)'''
+    sql = '''SELECT * FROM users WHERE (is_addbank is NULL) OR is_addbank = 0'''
     users = cursor.execute(sql).fetchall()
     return users
 

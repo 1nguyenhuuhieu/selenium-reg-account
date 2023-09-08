@@ -123,10 +123,13 @@ class UserInfo:
         self.pwd_money = str(random.randint(10000000, 100000000))
 
 def init_driver(proxy_server):
-    chrome_driver_path = 'chromedriver'
+    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36"
+    chrome_driver_path = 'drivers/chromedriver116.exe'
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument('--ignore-certificate-errors')
+    chrome_options.add_argument(f"user-agent={user_agent}")
+    chrome_options.add_argument("--headless")
     if proxy_server:
         chrome_options.add_argument('--proxy-server=' + proxy_server)
     else:
@@ -191,7 +194,7 @@ def save_record_to_database(user, url_web):
                                         user.bank_branch,
                                         user.name,
                                         user.phone,
-                                        False
+                                        None
                                         ))
     # Commit the changes
     conn.commit()

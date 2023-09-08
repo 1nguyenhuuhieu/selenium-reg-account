@@ -73,11 +73,36 @@ def load_image_from_base64(data_url):
     image = Image.open(image_buffer)
     return image
 
+def insert_all_chars(input_string):
+    # List of characters to insert
+    chars_to_insert = ['@', 'A', 'a', '0']
+
+    # Convert the string to a list of characters to make insertion easier
+    string_list = list(input_string)
+
+    # Get the length of the string
+    length = len(string_list)
+
+    # Shuffle the characters to insert randomly
+    random.shuffle(chars_to_insert)
+
+    # Insert each character at a random position
+    for char in chars_to_insert:
+        random_index = random.randint(0, length)
+        string_list.insert(random_index, char)
+        length += 1  # Increase the length of the string
+
+    # Convert the list of characters back to a string
+    modified_string = ''.join(string_list)
+
+    return modified_string
+
+
 def generate_password(length=8):
     characters = string.ascii_letters
     password = ''.join(random.choice(characters) for _ in range(length))
-    password += '@aA0'
-    return password
+    modified_string = insert_all_chars(password)
+    return modified_string
 
 def no_accent_vietnamese(s):
     s = re.sub(r'[àáạảãâầấậẩẫăằắặẳẵ]', 'a', s)
@@ -129,7 +154,7 @@ def init_driver(proxy_server):
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument('--ignore-certificate-errors')
     chrome_options.add_argument(f"user-agent={user_agent}")
-    chrome_options.add_argument("--headless")
+    # chrome_options.add_argument("--headless")
     if proxy_server:
         chrome_options.add_argument('--proxy-server=' + proxy_server)
     else:
@@ -260,6 +285,7 @@ def fill_login_form(form_login, user):
         pwd_login = user['pwd_login']
         inputs = form_login.find_elements(By.TAG_NAME, 'input')
         for input in inputs:
+            time.sleep(5)
             if input.get_attribute('ng-model') == '$ctrl.user.account.value':
                 input.send_keys(username)
             if input.get_attribute('ng-model') == '$ctrl.user.password.value':
@@ -283,7 +309,8 @@ def open_form(driver, url_register, option):
     else:
         value = '$ctrl.styles.login'
     driver.get(url_register)
-    time.sleep(2)
+
+    time.sleep(5)
     # Click close button
     close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
     while close_button:
@@ -358,6 +385,7 @@ def auto_register(url_web, user_info):
     driver = init_driver(proxy_server)
     print(f'Khởi tạo driver mới, proxy: {proxy_server}')
     print(f'{url_web} --- Bắt đầu đăng kí tài khoản: {user_info["name"]}. Số tài khoản: {user_info["bank_account"]}')
+
     
     limit_try = 3
     is_open_register_form = False
@@ -379,9 +407,20 @@ def auto_register(url_web, user_info):
                                     str(user_info['bank_account']),
                                     user_info['bank']
                                     )
+                    
                     fill_register_form(driver, user)
-                    time.sleep(2)
+                    time.sleep(5)
+                    driver.refresh()
+                    time.sleep(3)
+                    close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
+                    while close_button:
+                        close_button.click()
+                        time.sleep(1)
+                        close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
+                        time.sleep(1)
+
                     is_register_success = not get_element(driver, 'button', 'ng-class', '$ctrl.styles.reg')
+
                     if is_register_success:
                         print(f'{url_web} --- Đăng kí thành công tài khoản {user.username}, mật khẩu đăng nhập: {user.pwd_login}, mật khẩu rút tiền: {user.pwd_money}')
                         time.sleep(2)

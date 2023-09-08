@@ -277,6 +277,34 @@ def fill_register_form(driver, user):
         
         fill_captcha(form_submit)
 
+        time.sleep(5)
+        driver.refresh()
+        url_web = driver.current_url()
+        time.sleep(3)
+        close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
+        while close_button:
+            close_button.click()
+            time.sleep(1)
+            close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
+            time.sleep(1)
+
+        is_register_success = not get_element(driver, 'button', 'ng-class', '$ctrl.styles.reg')
+
+        if is_register_success:
+            print(f'{url_web} --- Đăng kí thành công tài khoản {user.username}, mật khẩu đăng nhập: {user.pwd_login}, mật khẩu rút tiền: {user.pwd_money}')
+            time.sleep(2)
+            # saved to database
+            try:
+                print('Try to save to database')	
+                save_record_to_database(user, url_web)
+            except:
+                print('Except to save to database')
+                pass
+            
+            return True
+        time.sleep(2)
+
+
     return None
 
 def fill_login_form(form_login, user):
@@ -408,31 +436,8 @@ def auto_register(url_web, user_info):
                                     user_info['bank']
                                     )
                     
-                    fill_register_form(driver, user)
-                    time.sleep(5)
-                    driver.refresh()
-                    time.sleep(3)
-                    close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
-                    while close_button:
-                        close_button.click()
-                        time.sleep(1)
-                        close_button = get_element(driver, "button", "ng-click", "$ctrl.ok()") or get_element(driver, "span", "ng-click", "$ctrl.ok()")
-                        time.sleep(1)
+                    is_register_success = fill_register_form(driver, user)
 
-                    is_register_success = not get_element(driver, 'button', 'ng-class', '$ctrl.styles.reg')
-
-                    if is_register_success:
-                        print(f'{url_web} --- Đăng kí thành công tài khoản {user.username}, mật khẩu đăng nhập: {user.pwd_login}, mật khẩu rút tiền: {user.pwd_money}')
-                        time.sleep(2)
-                        # saved to database
-                        try:
-                            print('Try to save to database')	
-                            save_record_to_database(user, url_web)
-                        except:
-                            print('Except to save to database')
-                            pass
-                        break
-                    time.sleep(2)
                 except:
                     pass
         except:
